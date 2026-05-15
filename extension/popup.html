@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Permission Detector</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0d0f; --surface: #141416; --border: #1e1e22;
+      --text: #f0f0f2; --muted: #5a5a6e;
+      --low: #22c55e; --medium: #f59e0b; --high: #ef4444; --critical: #a855f7; --accent: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 420px; min-height: 560px; max-height: 600px;
+      background: var(--bg); color: var(--text);
+      font-family: 'Inter', sans-serif; font-size: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    /* Header */
+    .header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .logo { width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0; }
+    .header-text h1 { font-size:13px;font-weight:700;color:var(--text);letter-spacing:-0.01em; }
+    .header-text p { font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace; }
+    .header-actions { margin-left:auto;display:flex;gap:6px; }
+    .icon-btn { width:28px;height:28px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s; }
+    .icon-btn:hover { color:var(--text);border-color:#444; }
+    /* Tabs */
+    .tabs { display:flex;border-bottom:1px solid var(--border);flex-shrink:0; }
+    .tab { flex:1;padding:9px 0;background:none;border:none;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:.05em;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase; }
+    .tab.active { color:var(--text);border-bottom-color:var(--accent); }
+    .tab:hover:not(.active) { color:#aaa; }
+    /* Content */
+    .content { flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a2a30 transparent; }
+    .content::-webkit-scrollbar { width:3px; }
+    .content::-webkit-scrollbar-thumb { background:#2a2a30;border-radius:2px; }
+    .panel { display:none;padding:12px; }
+    .panel.active { display:block; }
+    /* Alerts */
+    .alerts-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:8px; }
+    .alerts-title { font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em; }
+    .clear-btn { background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit; }
+    .clear-btn:hover { color:var(--high); }
+    .alert-item { margin-bottom:8px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;border-left:3px solid var(--border);cursor:pointer;transition:all .15s; }
+    .alert-item:hover { background:#1a1a20; }
+    .alert-item.risk-low { border-left-color:var(--low); }
+    .alert-item.risk-medium { border-left-color:var(--medium); }
+    .alert-item.risk-high { border-left-color:var(--high); }
+    .alert-item.risk-critical { border-left-color:var(--critical); }
+    .alert-top { display:flex;align-items:center;gap:6px;margin-bottom:3px; }
+    .alert-perm { font-size:11px;font-weight:700;color:var(--text); }
+    .risk-badge { font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.05em; }
+    .risk-badge.low { background:#052e16;color:var(--low); }
+    .risk-badge.medium { background:#451a03;color:var(--medium); }
+    .risk-badge.high { background:#450a0a;color:var(--high); }
+    .risk-badge.critical { background:#2e1065;color:var(--critical); }
+    .alert-time { margin-left:auto;font-size:9px;color:var(--muted); }
+    .alert-domain { font-size:10px;color:var(--muted);margin-bottom:3px; }
+    .alert-explanation { font-size:10px;color:#7777a0;line-height:1.5; }
+    .alert-actions { display:flex;gap:5px;margin-top:8px; }
+    .action-btn { padding:4px 9px;border-radius:5px;border:1px solid var(--border);font-size:9px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s; }
+    .action-btn.allow { background:#05261622;color:var(--low);border-color:#14532d; }
+    .action-btn.allow:hover { background:#14532d44; }
+    .action-btn.block { background:#1c000022;color:var(--high);border-color:#450a0a; }
+    .action-btn.block:hover { background:#450a0a44; }
+    .action-btn.trust { background:#1e1b4b22;color:var(--accent);border-color:#1e1b4b; }
+    .action-btn.trust:hover { background:#1e1b4b44; }
+    .flags { display:flex;flex-wrap:wrap;gap:3px;margin-top:5px; }
+    .flag-tag { font-size:9px;padding:2px 5px;background:#1a1a24;border:1px solid #2a2a38;color:#7777a8;border-radius:3px; }
+    /* Empty */
+    .empty-state { text-align:center;padding:40px 20px;color:var(--muted); }
+    .empty-state .big-icon { font-size:32px;margin-bottom:10px;opacity:.5; }
+    .empty-state p { font-size:11px;line-height:1.6; }
+    /* Dashboard */
+    .dash-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px; }
+    .dash-card { padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px; }
+    .dash-card-title { font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px; }
+    .dash-card-val { font-size:24px;font-weight:700;color:var(--text); }
+    .dash-card-sub { font-size:9px;color:var(--muted);margin-top:2px; }
+    .risk-bar { margin-bottom:10px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px; }
+    .risk-bar-title { font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px; }
+    .risk-row { display:flex;align-items:center;gap:8px;margin-bottom:5px; }
+    .risk-row-label { width:48px;font-size:10px; }
+    .risk-row-bar { flex:1;height:6px;background:#1a1a24;border-radius:3px;overflow:hidden; }
+    .risk-row-fill { height:100%;border-radius:3px;transition:width .5s ease; }
+    .risk-row-count { width:18px;font-size:10px;color:var(--muted);text-align:right; }
+    /* Site */
+    .site-card { padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px; }
+    .site-header { display:flex;align-items:center;gap:8px;margin-bottom:10px; }
+    .site-favicon { width:22px;height:22px;border-radius:5px;background:#222;display:flex;align-items:center;justify-content:center;font-size:12px; }
+    .site-domain { font-size:13px;font-weight:700;color:var(--text); }
+    .site-category { margin-left:auto;font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;background:#1e1e24;color:var(--muted);text-transform:uppercase;letter-spacing:.04em; }
+    .stats-row { display:grid;grid-template-columns:repeat(3,1fr);gap:7px; }
+    .stat-box { text-align:center;padding:8px 4px;background:#1a1a1f;border-radius:6px; }
+    .stat-val { font-size:18px;font-weight:700; }
+    .stat-label { font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px; }
+    .perm-tags { display:flex;flex-wrap:wrap;gap:4px;margin-top:6px; }
+    .perm-tag { font-size:10px;padding:3px 8px;background:#1a1a24;border:1px solid #2a2a38;color:#8888b0;border-radius:4px; }
+    /* Settings */
+    .settings-group { margin-bottom:14px; }
+    .settings-group-title { font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px; }
+    .setting-row { display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:4px; }
+    .setting-label { font-size:11px;color:var(--text); }
+    .setting-desc { font-size:9px;color:var(--muted);margin-top:2px; }
+    .toggle { position:relative;width:36px;height:20px;flex-shrink:0; }
+    .toggle input { opacity:0;width:0;height:0; }
+    .toggle-slider { position:absolute;top:0;left:0;right:0;bottom:0;background:#222;border-radius:10px;cursor:pointer;transition:background .2s; }
+    .toggle-slider:before { content:"";position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#5a5a6e;border-radius:50%;transition:transform .2s,background .2s; }
+    input:checked+.toggle-slider { background:#1e1b4b; }
+    input:checked+.toggle-slider:before { transform:translateX(16px);background:var(--accent); }
+    .backend-input { width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;margin-top:5px;outline:none; }
+    .backend-input:focus { border-color:var(--accent); }
+    .save-btn { width:100%;padding:9px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-family:'Inter',sans-serif;font-weight:700;font-size:12px;cursor:pointer;margin-top:10px;transition:opacity .15s; }
+    .save-btn:hover { opacity:.85; }
+    /* Loader */
+    .loader { display:flex;align-items:center;justify-content:center;padding:30px;gap:6px; }
+    .dot { width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse .8s ease-in-out infinite; }
+    .dot:nth-child(2) { animation-delay:.15s; }
+    .dot:nth-child(3) { animation-delay:.3s; }
+    @keyframes pulse { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">🛡</div>
+  <div class="header-text">
+    <h1>AI Permission Detector</h1>
+    <p id="status-text">Monitoring active</p>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="refresh-btn" title="Refresh">↻</button>
+  </div>
+</div>
+<div class="tabs">
+  <button class="tab active" data-tab="alerts">Alerts</button>
+  <button class="tab" data-tab="dashboard">Stats</button>
+  <button class="tab" data-tab="site">Site</button>
+  <button class="tab" data-tab="settings">Settings</button>
+</div>
+<div class="content">
+  <!-- ALERTS -->
+  <div class="panel active" id="tab-alerts">
+    <div class="loader" id="alerts-loader">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div id="alerts-container" style="display:none">
+      <div class="alerts-header">
+        <span class="alerts-title" id="alerts-count-label">Recent Alerts</span>
+        <button class="clear-btn" id="clear-alerts-btn">Clear All</button>
+      </div>
+      <div id="alerts-list"></div>
+    </div>
+  </div>
+  <!-- DASHBOARD -->
+  <div class="panel" id="tab-dashboard">
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-card-title">Total Alerts</div><div class="dash-card-val" id="dash-total">—</div><div class="dash-card-sub">All time</div></div>
+      <div class="dash-card"><div class="dash-card-title">High Risk</div><div class="dash-card-val" id="dash-high" style="color:var(--high)">—</div><div class="dash-card-sub">Blocked + warnings</div></div>
+      <div class="dash-card"><div class="dash-card-title">Sites Analyzed</div><div class="dash-card-val" id="dash-sites">—</div><div class="dash-card-sub">Unique domains</div></div>
+      <div class="dash-card"><div class="dash-card-title">User Decisions</div><div class="dash-card-val" id="dash-decisions" style="color:var(--accent)">—</div><div class="dash-card-sub">Allow / Block</div></div>
+    </div>
+    <div class="risk-bar">
+      <div class="risk-bar-title">Risk Distribution</div>
+      <div class="risk-row"><span class="risk-row-label" style="color:var(--critical)">Critical</span><div class="risk-row-bar"><div class="risk-row-fill" id="bar-critical" style="background:var(--critical);width:0%"></div></div><span class="risk-row-count" id="cnt-critical">0</span></div>
+      <div class="risk-row"><span class="risk-row-label" style="color:var(--high)">High</span><div class="risk-row-bar"><div class="risk-row-fill" id="bar-high" style="background:var(--high);width:0%"></div></div><span class="risk-row-count" id="cnt-high">0</span></div>
+      <div class="risk-row"><span class="risk-row-label" style="color:var(--medium)">Medium</span><div class="risk-row-bar"><div class="risk-row-fill" id="bar-medium" style="background:var(--medium);width:0%"></div></div><span class="risk-row-count" id="cnt-medium">0</span></div>
+      <div class="risk-row"><span class="risk-row-label" style="color:var(--low)">Low</span><div class="risk-row-bar"><div class="risk-row-fill" id="bar-low" style="background:var(--low);width:0%"></div></div><span class="risk-row-count" id="cnt-low">0</span></div>
+    </div>
+    <div class="dash-card" style="margin-bottom:10px">
+      <div class="dash-card-title">Top Requested Permissions</div>
+      <div id="top-permissions" style="margin-top:8px;font-size:11px;color:var(--muted)">Loading...</div>
+    </div>
+  </div>
+  <!-- CURRENT SITE -->
+  <div class="panel" id="tab-site">
+    <div id="site-content">
+      <div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+  </div>
+  <!-- SETTINGS -->
+  <div class="panel" id="tab-settings">
+    <div class="settings-group">
+      <div class="settings-group-title">Detection Behavior</div>
+      <div class="setting-row"><div><div class="setting-label">Auto-block high risk</div><div class="setting-desc">Automatically deny critical permissions</div></div><label class="toggle"><input type="checkbox" id="set-autoblock"><span class="toggle-slider"></span></label></div>
+      <div class="setting-row"><div><div class="setting-label">Alert on High risk</div><div class="setting-desc">Show notifications for high/critical</div></div><label class="toggle"><input type="checkbox" id="set-notify-high" checked><span class="toggle-slider"></span></label></div>
+      <div class="setting-row"><div><div class="setting-label">Alert on Medium risk</div><div class="setting-desc">Show notifications for medium risk</div></div><label class="toggle"><input type="checkbox" id="set-notify-medium"><span class="toggle-slider"></span></label></div>
+      <div class="setting-row"><div><div class="setting-label">Enable learning</div><div class="setting-desc">Send decisions to improve AI model</div></div><label class="toggle"><input type="checkbox" id="set-learning" checked><span class="toggle-slider"></span></label></div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">AI Backend</div>
+      <div class="setting-row" style="flex-direction:column;align-items:flex-start">
+        <div class="setting-label">Backend Server URL</div>
+        <div class="setting-desc">FastAPI server for AI analysis</div>
+        <input type="text" class="backend-input" id="set-backend-url" placeholder="http://localhost:8000" value="http://localhost:8000">
+      </div>
+    </div>
+    <button class="save-btn" id="save-settings-btn">Save Settings</button>
+  </div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>
