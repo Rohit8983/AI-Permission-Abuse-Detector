@@ -1,6 +1,6 @@
 // background.js — AI Permission Abuse Detector Service Worker
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = "https://ai-permission-abuse-detector.onrender.com/";
 const RISK_COLORS = {
   low: "#22c55e",
   medium: "#f59e0b",
@@ -379,7 +379,7 @@ async function getSettings() {
     autoBlock: false,
     notifyOnHigh: true,
     notifyOnMedium: false,
-    backendUrl: "http://localhost:8000",
+    backendUrl: "https://ai-permission-abuse-detector.onrender.com/",
     enableLearning: true,
     showBadge: true
   };

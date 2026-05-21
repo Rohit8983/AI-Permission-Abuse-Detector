@@ -22,7 +22,9 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
     }
   ],
   "action": {
@@ -43,7 +45,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["alert.html", "alert.js", "styles.css"],
+      "resources": ["icons/*", "popup.html", "popup.js"],
       "matches": ["<all_urls>"]
     }
   ]

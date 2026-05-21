@@ -25,9 +25,6 @@ No more blindly clicking "Allow" and hoping for the best.
 
 Download the `ai-permission-detector.zip` file and unzip it anywhere on your computer — for example:
 
-```
-C:\Users\YourName\ai-permission-detector\
-```
 
 You will see two folders inside:
 - 📁 `extension/` — this is the Chrome extension
@@ -50,32 +47,6 @@ You will see two folders inside:
 The extension is now installed. You will see the 🛡️ shield icon appear in your Chrome toolbar.
 
 > **Pinning the icon (recommended):** Click the 🧩 puzzle piece icon in the toolbar → find "AI Permission Detector" → click the 📌 pin icon so it's always visible.
-
----
-
-### Step 3 — Test It on webcamtests.com
-
-This is the easiest way to confirm it's working:
-
-1. Open a new tab and go to **https://webcamtests.com/**
-2. Click **"Test my cam"**
-3. When the browser asks for camera access, click **Allow**
-
-You should immediately see a green banner slide down from the top of the page:
-
-```
-✅  LOW RISK  —  🛡️ AI Permission Detector · Camera requested on webcamtests.com
-    "Camera access is expected for this type of site. This appears legitimate."
-                                                              [ Allow ]  [ ✕ ]
-```
-
-This means the extension is working correctly. Webcamtests.com is a legitimate camera testing site, so the risk is low.
-
----
-
-### Step 4 — See a High Risk Warning
-
-Try visiting a news site and manually triggering a permission in the browser console to see a critical warning. Or simply browse normally — the extension will alert you automatically whenever any site requests a permission that seems out of place.
 
 ---
 
@@ -103,13 +74,13 @@ Whenever a website requests a permission, a banner slides in from the top of the
 
 Click the 🛡️ icon in your toolbar to open the popup. It has 4 tabs:
 
-#### 📋 Alerts Tab
+#### Alerts Tab
 Shows every permission request that was detected, from newest to oldest. For each alert you can see:
 - Which permission was requested and by which site
 - The risk level and AI explanation
 - **Allow Once**, **Block**, and **Trust Site** buttons to record your decision
 
-#### 📊 Stats Tab
+#### Stats Tab
 Shows your overall detection history:
 - Total alerts detected
 - How many were high/critical risk
@@ -117,14 +88,14 @@ Shows your overall detection history:
 - A bar chart of risk distribution
 - Top requested permissions across all sites
 
-#### 🌐 Current Site Tab
+#### Current Site Tab
 Shows live information about the tab you currently have open:
 - Site category (e.g. "e commerce", "news", "social media")
 - Total alerts for this domain
 - All permissions this site has ever requested
 - Number of decisions you've made for this site
 
-#### ⚙️ Settings Tab
+#### Settings Tab
 Configure how the extension behaves:
 
 | Setting | What It Does |
@@ -133,23 +104,11 @@ Configure how the extension behaves:
 | Alert on High risk | Shows a Chrome notification for high/critical detections |
 | Alert on Medium risk | Shows a Chrome notification for medium risk detections |
 | Enable learning | Sends your block/allow decisions to improve the AI model |
-| Backend Server URL | Address of your local FastAPI backend (default: `http://localhost:8000`) |
+| Backend Server URL | Address of your local FastAPI backend `https://ai-permission-abuse-detector.onrender.com/docs#/` |
 
 ---
 
-## Permission Risk Guide
 
-Here is how the AI rates each permission type by website category:
-
-| Permission | Shopping | Banking | News | Blog | Video Call | Social |
-|---|---|---|---|---|---|---|
-| 📷 Camera | 🔴 HIGH | 🔴 HIGH | 🚨 CRITICAL | 🚨 CRITICAL | ✅ LOW | ✅ LOW |
-| 🎤 Microphone | 🔴 HIGH | 🔴 HIGH | 🚨 CRITICAL | 🚨 CRITICAL | ✅ LOW | ✅ LOW |
-| 📍 Location | ✅ LOW | 🟡 MEDIUM | 🟡 MEDIUM | 🔴 HIGH | 🟡 MEDIUM | ✅ LOW |
-| 📋 Clipboard Read | 🔴 HIGH | 🚨 CRITICAL | 🔴 HIGH | 🚨 CRITICAL | 🟡 MEDIUM | 🟡 MEDIUM |
-| 🔔 Notifications | ✅ LOW | 🟡 MEDIUM | ✅ LOW | 🟡 MEDIUM | ✅ LOW | ✅ LOW |
-
----
 
 ## Optional: Run the AI Backend
 
@@ -181,9 +140,9 @@ source venv/bin/activate
 python main.py
 ```
 
-The server starts at `http://localhost:8000`. You can verify it's running by visiting that URL in your browser — you should see a JSON response.
+The server starts at `https://ai-permission-abuse-detector.onrender.com/`. You can verify it's running by visiting that URL in your browser — you should see a JSON response.
 
-Once the backend is running, go to the extension **Settings tab** and make sure the Backend Server URL is set to `http://localhost:8000`. The extension will automatically use the AI backend for all future analyses.
+Once the backend is running, go to the extension **Settings tab** and make sure the Backend Server URL is set to `https://ai-permission-abuse-detector.onrender.com/docs#/`. The extension will automatically use the AI backend for all future analyses.
 
 > The backend only runs on your own machine. No data is ever sent to external servers.
 
@@ -212,27 +171,5 @@ Never. Everything runs locally — on your machine. The extension stores data in
 **Can I use this on Firefox?**
 Not yet. This version is built for Chrome (Manifest V3). Firefox support is planned as a future enhancement.
 
----
 
-## Uninstalling
 
-1. Go to `chrome://extensions/`
-2. Find **AI Permission Detector**
-3. Click **"Remove"**
-4. Optionally delete the unzipped folder from your computer
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| Extension not loading | Make sure you selected the `extension/` folder, not the outer folder |
-| Banner not appearing | Hard refresh the page with `Ctrl + Shift + R` after reloading the extension |
-| Popup shows no alerts | Visit a site and trigger a permission first — alerts are per-session |
-| Backend connection failed | Make sure `python main.py` is running and check the URL in Settings |
-| Camera still works after clicking Block | The Block button records your preference — use Chrome's own deny button to fully block |
-
----
-
-*Built with Chrome Extension API (Manifest V3) · scikit-learn · FastAPI · SQLite*
