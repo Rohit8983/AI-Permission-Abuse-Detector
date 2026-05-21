@@ -144,7 +144,7 @@ The server starts at `https://ai-permission-abuse-detector.onrender.com/`. You c
 
 Once the backend is running, go to the extension **Settings tab** and make sure the Backend Server URL is set to `https://ai-permission-abuse-detector.onrender.com/docs#/`. The extension will automatically use the AI backend for all future analyses.
 
-> The backend only runs on your own machine. No data is ever sent to external servers.
+
 
 ---
 
