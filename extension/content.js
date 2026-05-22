@@ -1,193 +1,330 @@
-// content.js — runs in MAIN world directly, no injection needed
+// content.js — Strict Trusted Types safe (YouTube/Gmail/Google compatible)
+// NO innerHTML, NO cssText, NO insertAdjacentHTML — pure DOM only
 
 (function () {
+  "use strict";
+
   if (window.__aiPermHooked) return;
   window.__aiPermHooked = true;
   window.__aiPermDetectorLoaded = true;
 
   const intercepted = new Set();
+  const _chrome = (typeof browser !== "undefined") ? browser : chrome;
 
   // ── Risk Analysis ──────────────────────────────────────────────────────────
   function analyzeRisk(permission) {
-    const url = location.href;
-    const combined = (url + " " + document.title).toLowerCase();
+    const combined = (location.href + " " + document.title).toLowerCase();
 
     let category = "unknown";
     const cats = [
-      ["video_conference", ["zoom", "meet.google", "teams.microsoft", "webex", "jitsi", "whereby", "skype"]],
-      ["camera_test",      ["webcamtest", "webcam-test", "camtest", "camera-test", "mictests", "webcamtests"]],
-      ["social_media",     ["facebook", "twitter", "instagram", "linkedin", "tiktok", "reddit", "discord"]],
-      ["e_commerce",       ["amazon", "ebay", "shopify", "etsy", "shop", "store", "cart", "checkout"]],
-      ["banking",          ["bank", "chase", "paypal", "stripe", "finance", "invest", "credit", "loan"]],
-      ["news",             ["bbc", "cnn", "nytimes", "guardian", "reuters", "/news", "article", "breaking"]],
-      ["education",        [".edu", "coursera", "udemy", "khanacademy", "university", "college"]],
-      ["entertainment",    ["youtube", "netflix", "spotify", "twitch", "hulu", "game", "stream"]],
-      ["health",           ["webmd", "mayoclinic", "health", "medical", "hospital", "clinic"]],
-      ["blog",             ["blog", "wordpress", "medium.com", "substack"]],
+      ["video_conference", ["zoom.us", "meet.google", "teams.microsoft", "webex", "jitsi", "whereby.com", "skype"]],
+      ["camera_test",      ["webcamtest", "webcam-test", "camtest", "webcamtests", "mic-test"]],
+      ["social_media",     ["facebook.com", "twitter.com", "x.com", "instagram.com", "linkedin.com", "tiktok.com", "reddit.com", "discord.com"]],
+      ["e_commerce",       ["amazon.", "ebay.", "shopify", "etsy.", "flipkart", "/cart", "/checkout"]],
+      ["banking",          ["bank", "chase.com", "paypal.com", "stripe.com", "finance", "invest", "credit", "loan"]],
+      ["news",             ["bbc.", "cnn.", "nytimes.", "theguardian", "reuters.", "/news/", "breaking"]],
+      ["education",        [".edu", "coursera.", "udemy.", "khanacademy.", "edx.", "university", "college"]],
+      ["entertainment",    ["youtube.com", "netflix.", "spotify.", "twitch.", "hulu.", "primevideo", "hotstar", "gaming"]],
+      ["health",           ["webmd.", "mayoclinic.", "/health/", "medical", "hospital", "clinic", "pharmacy"]],
+      ["blog",             ["medium.com", "wordpress.", "substack.", "ghost.io", "blogger."]],
+      ["search",           ["google.com/search", "bing.com/search", "duckduckgo.com", "yahoo.com/search"]],
     ];
     for (const [cat, terms] of cats) {
       if (terms.some(t => combined.includes(t))) { category = cat; break; }
     }
 
     const matrix = {
-      camera:           { video_conference:"low", social_media:"low", camera_test:"low", education:"low", e_commerce:"high", banking:"high", news:"critical", blog:"critical", unknown:"medium" },
-      microphone:       { video_conference:"low", social_media:"low", camera_test:"low", education:"low", e_commerce:"high", banking:"high", news:"critical", blog:"critical", unknown:"medium" },
-      geolocation:      { e_commerce:"low", social_media:"low", news:"medium", banking:"medium", blog:"high", unknown:"medium" },
-      "clipboard-read": { banking:"critical", e_commerce:"high", news:"high", blog:"critical", video_conference:"medium", unknown:"high" },
-      "clipboard-write":{ video_conference:"low", e_commerce:"low", unknown:"medium" },
-      notifications:    { social_media:"low", e_commerce:"low", news:"low", banking:"medium", blog:"medium", unknown:"medium" },
+      "camera":          { video_conference:"low", social_media:"low", camera_test:"low", education:"low", entertainment:"low", e_commerce:"high", banking:"high", news:"critical", blog:"critical", search:"high", health:"medium", unknown:"medium" },
+      "microphone":      { video_conference:"low", social_media:"low", camera_test:"low", education:"low", entertainment:"low", e_commerce:"high", banking:"high", news:"critical", blog:"critical", search:"low",  health:"medium", unknown:"medium" },
+      "geolocation":     { e_commerce:"low", social_media:"low", entertainment:"low", search:"low", health:"low", camera_test:"low", news:"medium", banking:"medium", education:"medium", video_conference:"medium", blog:"high", unknown:"medium" },
+      "clipboard-read":  { banking:"critical", blog:"critical", e_commerce:"high", news:"high", unknown:"high", video_conference:"medium", social_media:"medium", education:"low", search:"medium", entertainment:"medium", health:"medium", camera_test:"low" },
+      "clipboard-write": { video_conference:"low", e_commerce:"low", search:"low", social_media:"low", education:"low", entertainment:"low", health:"low", camera_test:"low", news:"medium", blog:"medium", banking:"medium", unknown:"medium" },
+      "notifications":   { social_media:"low", e_commerce:"low", news:"low", entertainment:"low", education:"low", search:"low", health:"low", camera_test:"low", video_conference:"low", banking:"medium", blog:"medium", unknown:"medium" },
     };
 
     const riskLevel = matrix[permission]?.[category] ?? "medium";
-    const expl = {
-      critical: `⛔ A ${category.replace(/_/g," ")} site requested ${fmtPerm(permission)} — this is almost never legitimate and may indicate surveillance or data theft.`,
-      high:     `⚠️ ${fmtPerm(permission)} is unusual for a ${category.replace(/_/g," ")} site. This could be an attempt to collect your data without consent.`,
-      medium:   `${fmtPerm(permission)} was requested. Somewhat unexpected — verify you trust this site before allowing.`,
-      low:      `${fmtPerm(permission)} access is expected for this type of site (${category.replace(/_/g," ")}). Appears legitimate.`,
+    const label     = fmtPerm(permission);
+    const catLabel  = category.replace(/_/g, " ");
+    const domain    = location.hostname.replace("www.", "");
+
+    const explanations = {
+      critical: "\u26D4 " + domain + " is a " + catLabel + " site. Requesting " + label + " is almost never legitimate here and may indicate surveillance or data theft.",
+      high:     "\u26A0 " + label + " is unusual for a " + catLabel + " site. This could be an attempt to collect your data without consent.",
+      medium:   label + " requested on " + domain + ". Somewhat unexpected for a " + catLabel + " site \u2014 verify you trust it before allowing.",
+      low:      label + " is expected for this type of site (" + catLabel + "). This appears to be a legitimate request.",
     };
-    return { category, riskLevel, explanation: expl[riskLevel] };
+
+    return { category, riskLevel, explanation: explanations[riskLevel] };
   }
 
-  // ── Banner ─────────────────────────────────────────────────────────────────
-  function showBanner(permission, analysis) {
-    document.getElementById("__aipd_banner")?.remove();
-
-    const p = {
-      low:      { border:"#22c55e", bg:"#052e16", icon:"✅" },
-      medium:   { border:"#f59e0b", bg:"#1c1200", icon:"⚡" },
-      high:     { border:"#ef4444", bg:"#1c0000", icon:"⚠️" },
-      critical: { border:"#a855f7", bg:"#170a2e", icon:"🚨" },
-    }[analysis.riskLevel] || { border:"#ef4444", bg:"#1c0000", icon:"⚠️" };
-
-    const b = document.createElement("div");
-    b.id = "__aipd_banner";
-    b.style.cssText = `
-      all:initial;
-      position:fixed!important;
-      top:0!important;left:0!important;right:0!important;
-      z-index:2147483647!important;
-      background:${p.bg}!important;
-      border-bottom:3px solid ${p.border}!important;
-      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif!important;
-      box-shadow:0 4px 24px rgba(0,0,0,.7)!important;
-      display:block!important;
-    `;
-
-    b.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;padding:11px 16px;box-sizing:border-box">
-        <span style="font-size:20px;flex-shrink:0">${p.icon}</span>
-        <span style="background:${p.border}22;border:1.5px solid ${p.border};color:${p.border};
-          padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800;
-          letter-spacing:.08em;text-transform:uppercase;font-family:monospace;flex-shrink:0">
-          ${analysis.riskLevel.toUpperCase()} RISK
-        </span>
-        <div style="flex:1;min-width:0">
-          <div style="color:#f5f5f5;font-weight:700;font-size:13px;margin-bottom:2px">
-            🛡️ AI Permission Detector &nbsp;·&nbsp; ${fmtPerm(permission)} requested on <strong style="color:${p.border}">${location.hostname.replace("www.","")}</strong>
-          </div>
-          <div style="color:#bbb;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            ${analysis.explanation}
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          ${analysis.riskLevel !== "low" ? `<button id="__aipd_block" style="padding:5px 14px;border-radius:5px;border:1.5px solid ${p.border};background:${p.border}33;color:${p.border};font-weight:700;cursor:pointer;font-size:11px;font-family:sans-serif">Block</button>` : ""}
-          <button id="__aipd_allow" style="padding:5px 14px;border-radius:5px;border:1px solid #555;background:#2a2a2a;color:#ccc;font-weight:700;cursor:pointer;font-size:11px;font-family:sans-serif">Allow</button>
-          <button id="__aipd_close" style="padding:5px 10px;border-radius:5px;border:1px solid #333;background:none;color:#666;font-size:16px;cursor:pointer;line-height:1;font-family:sans-serif">✕</button>
-        </div>
-      </div>
-    `;
-
-    (document.body || document.documentElement).prepend(b);
-
-    b.querySelector("#__aipd_close")?.addEventListener("click", () => b.remove());
-    b.querySelector("#__aipd_allow")?.addEventListener("click", () => b.remove());
-    b.querySelector("#__aipd_block")?.addEventListener("click", () => {
-      b.innerHTML = `<div style="padding:10px 16px;color:${p.border};font-weight:700;font-family:sans-serif;display:flex;justify-content:space-between;align-items:center">
-        <span>🚫 ${fmtPerm(permission)} blocked by AI Permission Detector</span>
-        <button onclick="this.closest('#__aipd_banner').remove()" style="background:none;border:none;color:#666;cursor:pointer;font-size:16px">✕</button>
-      </div>`;
-    });
-
-    if (analysis.riskLevel === "low") setTimeout(() => b?.remove(), 5000);
-  }
-
-  // ── Notify background ──────────────────────────────────────────────────────
-  function notifyBackground(permission) {
-    try {
-      chrome.runtime.sendMessage({
-        type: "PERMISSION_INTERCEPTED",
-        data: {
-          permission,
-          url: location.href,
-          pageTitle: document.title,
-          pageKeywords: [],
-          timestamp: new Date().toISOString()
-        }
-      });
-    } catch(e) {}
-  }
-
-  // ── Handle intercept ───────────────────────────────────────────────────────
-  function intercept(permission) {
-    if (intercepted.has(permission)) return;
-    intercepted.add(permission);
-    const analysis = analyzeRisk(permission);
-    showBanner(permission, analysis);
-    notifyBackground(permission);
-  }
-
-  // ── Hook getUserMedia ──────────────────────────────────────────────────────
-  if (navigator.mediaDevices?.getUserMedia) {
-    const _orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = function(constraints) {
-      if (constraints?.video) intercept("camera");
-      if (constraints?.audio) intercept("microphone");
-      return _orig(constraints);
-    };
-  }
-
-  // ── Hook geolocation ──────────────────────────────────────────────────────
-  if (navigator.geolocation) {
-    const _gcp = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
-    navigator.geolocation.getCurrentPosition = function(...a) { intercept("geolocation"); return _gcp(...a); };
-    const _gwp = navigator.geolocation.watchPosition.bind(navigator.geolocation);
-    navigator.geolocation.watchPosition = function(...a) { intercept("geolocation"); return _gwp(...a); };
-  }
-
-  // ── Hook clipboard ─────────────────────────────────────────────────────────
-  if (navigator.clipboard) {
-    ["read","readText"].forEach(fn => {
-      if (navigator.clipboard[fn]) {
-        const _o = navigator.clipboard[fn].bind(navigator.clipboard);
-        navigator.clipboard[fn] = function(...a) { intercept("clipboard-read"); return _o(...a); };
-      }
-    });
-    if (navigator.clipboard.write) {
-      const _o = navigator.clipboard.write.bind(navigator.clipboard);
-      navigator.clipboard.write = function(...a) { intercept("clipboard-write"); return _o(...a); };
+  // ── Style helper — sets ONE property at a time (no cssText) ───────────────
+  function css(el, props) {
+    for (const [k, v] of Object.entries(props)) {
+      el.style.setProperty(
+        k.replace(/([A-Z])/g, "-$1").toLowerCase(),
+        v
+      );
     }
   }
 
-  // ── Hook Notification ──────────────────────────────────────────────────────
-  if (window.Notification?.requestPermission) {
-    const _o = Notification.requestPermission.bind(Notification);
-    Notification.requestPermission = function(...a) { intercept("notifications"); return _o(...a); };
+  // ── Banner — zero innerHTML, zero cssText, zero Object.assign on style ────
+  function showBanner(permission, analysis) {
+    const old = document.getElementById("__aipd_banner");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+
+    const pal = {
+      low:      { border: "#22c55e", bg: "#052e16", icon: "\u2705" },
+      medium:   { border: "#f59e0b", bg: "#1c1200", icon: "\u26A1" },
+      high:     { border: "#ef4444", bg: "#1c0000", icon: "\u26A0" },
+      critical: { border: "#a855f7", bg: "#170a2e", icon: "\uD83D\uDEA8" },
+    }[analysis.riskLevel] || { border: "#ef4444", bg: "#1c0000", icon: "\u26A0" };
+
+    // ── Banner root ──
+    const banner = document.createElement("div");
+    banner.setAttribute("id", "__aipd_banner");
+    css(banner, {
+      position:     "fixed",
+      top:          "0",
+      left:         "0",
+      right:        "0",
+      zIndex:       "2147483647",
+      background:   pal.bg,
+      borderBottom: "3px solid " + pal.border,
+      fontFamily:   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+      boxShadow:    "0 4px 24px rgba(0,0,0,0.75)",
+      boxSizing:    "border-box",
+    });
+
+    // ── Inner row ──
+    const row = document.createElement("div");
+    css(row, {
+      display:    "flex",
+      alignItems: "center",
+      gap:        "10px",
+      padding:    "10px 16px",
+      boxSizing:  "border-box",
+      flexWrap:   "nowrap",
+    });
+
+    // ── Icon ──
+    const iconEl = document.createElement("span");
+    iconEl.textContent = pal.icon;
+    css(iconEl, { fontSize: "18px", flexShrink: "0" });
+
+    // ── Risk badge ──
+    const badge = document.createElement("span");
+    badge.textContent = analysis.riskLevel.toUpperCase() + " RISK";
+    css(badge, {
+      background:    pal.border + "28",
+      border:        "1.5px solid " + pal.border,
+      color:         pal.border,
+      padding:       "2px 8px",
+      borderRadius:  "4px",
+      fontSize:      "9px",
+      fontWeight:    "800",
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+      fontFamily:    "monospace",
+      flexShrink:    "0",
+      whiteSpace:    "nowrap",
+    });
+
+    // ── Text block ──
+    const textBlock = document.createElement("div");
+    css(textBlock, { flex: "1", minWidth: "0", overflow: "hidden" });
+
+    // Title — built with text nodes only
+    const titleEl = document.createElement("div");
+    css(titleEl, {
+      color:         "#f5f5f5",
+      fontWeight:    "700",
+      fontSize:      "12px",
+      marginBottom:  "2px",
+      whiteSpace:    "nowrap",
+      overflow:      "hidden",
+      textOverflow:  "ellipsis",
+    });
+    const t1 = document.createTextNode("\uD83D\uDEE1 AI Permission Detector \u00B7 ");
+    const strong = document.createElement("strong");
+    strong.textContent = fmtPerm(permission);
+    css(strong, { color: pal.border });
+    const t2 = document.createTextNode(" requested on " + location.hostname.replace("www.", ""));
+    titleEl.appendChild(t1);
+    titleEl.appendChild(strong);
+    titleEl.appendChild(t2);
+
+    // Explanation
+    const expEl = document.createElement("div");
+    expEl.textContent = analysis.explanation;
+    css(expEl, {
+      color:        "#bbbbbb",
+      fontSize:     "11px",
+      overflow:     "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace:   "nowrap",
+    });
+
+    textBlock.appendChild(titleEl);
+    textBlock.appendChild(expEl);
+
+    // ── Buttons ──
+    const btnWrap = document.createElement("div");
+    css(btnWrap, { display: "flex", gap: "6px", flexShrink: "0" });
+
+    if (analysis.riskLevel !== "low") {
+      const blockBtn = mkBtn("Block", pal.border + "33", pal.border, "1.5px solid " + pal.border);
+      blockBtn.addEventListener("click", function () {
+        // Clear title safely
+        while (titleEl.firstChild) titleEl.removeChild(titleEl.firstChild);
+        titleEl.appendChild(document.createTextNode("\uD83D\uDEAB " + fmtPerm(permission) + " blocked by AI Permission Detector"));
+        expEl.textContent = "This request has been recorded as blocked.";
+        if (blockBtn.parentNode) blockBtn.parentNode.removeChild(blockBtn);
+        try { _chrome.runtime.sendMessage({ type: "USER_DECISION", data: { permission: permission, decision: "block", domain: location.hostname } }); } catch (e) {}
+      });
+      btnWrap.appendChild(blockBtn);
+    }
+
+    const allowBtn = mkBtn("Allow", "#2a2a2a", "#cccccc", "1px solid #555555");
+    allowBtn.addEventListener("click", function () {
+      if (banner.parentNode) banner.parentNode.removeChild(banner);
+    });
+    btnWrap.appendChild(allowBtn);
+
+    const closeBtn = mkBtn("\u00D7", "transparent", "#888888", "1px solid #333333");
+    css(closeBtn, { fontSize: "15px", lineHeight: "1" });
+    closeBtn.addEventListener("click", function () {
+      if (banner.parentNode) banner.parentNode.removeChild(banner);
+    });
+    btnWrap.appendChild(closeBtn);
+
+    // ── Assemble ──
+    row.appendChild(iconEl);
+    row.appendChild(badge);
+    row.appendChild(textBlock);
+    row.appendChild(btnWrap);
+    banner.appendChild(row);
+
+    // ── Insert at top of body ──
+    const target = document.body || document.documentElement;
+    if (target) {
+      target.insertBefore(banner, target.firstChild);
+    }
+
+    // Auto-dismiss low risk after 5s
+    if (analysis.riskLevel === "low") {
+      setTimeout(function () {
+        if (banner.parentNode) banner.parentNode.removeChild(banner);
+      }, 5000);
+    }
   }
 
-  // ── Hook permissions.query ─────────────────────────────────────────────────
-  if (navigator.permissions?.query) {
-    const _o = navigator.permissions.query.bind(navigator.permissions);
-    navigator.permissions.query = function(d) {
-      if (d?.name) intercept(d.name);
-      return _o(d);
+  // ── Button factory (no cssText) ───────────────────────────────────────────
+  function mkBtn(label, bg, color, border) {
+    const btn = document.createElement("button");
+    btn.textContent = label;
+    css(btn, {
+      padding:       "5px 12px",
+      borderRadius:  "5px",
+      border:        border,
+      background:    bg,
+      color:         color,
+      fontWeight:    "700",
+      cursor:        "pointer",
+      fontSize:      "11px",
+      fontFamily:    "sans-serif",
+      flexShrink:    "0",
+      outline:       "none",
+    });
+    return btn;
+  }
+
+  // ── Intercept ─────────────────────────────────────────────────────────────
+  function intercept(permission) {
+    if (intercepted.has(permission)) return;
+    intercepted.add(permission);
+
+    const analysis = analyzeRisk(permission);
+    showBanner(permission, analysis);
+
+    try {
+      _chrome.runtime.sendMessage({
+        type: "PERMISSION_INTERCEPTED",
+        data: {
+          permission:  permission,
+          url:         location.href,
+          pageTitle:   document.title,
+          pageKeywords:[],
+          category:    analysis.category,
+          riskLevel:   analysis.riskLevel,
+          explanation: analysis.explanation,
+          timestamp:   new Date().toISOString(),
+        }
+      });
+    } catch (e) { /* background inactive — banner already shown */ }
+  }
+
+  // ── API Hooks ─────────────────────────────────────────────────────────────
+
+  // getUserMedia
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    var _gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = function (c) {
+      if (c && c.video) intercept("camera");
+      if (c && c.audio) intercept("microphone");
+      return _gum.call(this, c);
     };
   }
 
-  // ── Utilities ──────────────────────────────────────────────────────────────
+  // Geolocation
+  if (navigator.geolocation) {
+    var _gcp = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+    navigator.geolocation.getCurrentPosition = function () {
+      intercept("geolocation"); return _gcp.apply(this, arguments);
+    };
+    var _gwp = navigator.geolocation.watchPosition.bind(navigator.geolocation);
+    navigator.geolocation.watchPosition = function () {
+      intercept("geolocation"); return _gwp.apply(this, arguments);
+    };
+  }
+
+  // Clipboard
+  if (navigator.clipboard) {
+    ["read", "readText"].forEach(function (fn) {
+      if (navigator.clipboard[fn]) {
+        var _o = navigator.clipboard[fn].bind(navigator.clipboard);
+        navigator.clipboard[fn] = function () { intercept("clipboard-read"); return _o.apply(this, arguments); };
+      }
+    });
+    ["write", "writeText"].forEach(function (fn) {
+      if (navigator.clipboard[fn]) {
+        var _o = navigator.clipboard[fn].bind(navigator.clipboard);
+        navigator.clipboard[fn] = function () { intercept("clipboard-write"); return _o.apply(this, arguments); };
+      }
+    });
+  }
+
+  // Notification
+  if (window.Notification && window.Notification.requestPermission) {
+    var _nrp = window.Notification.requestPermission.bind(window.Notification);
+    window.Notification.requestPermission = function () {
+      intercept("notifications"); return _nrp.apply(this, arguments);
+    };
+  }
+
+  // permissions.query
+  if (navigator.permissions && navigator.permissions.query) {
+    var _pq = navigator.permissions.query.bind(navigator.permissions);
+    var skipPerms = ["accelerometer","gyroscope","magnetometer","payment-handler","periodic-background-sync","midi","storage-access","window-management"];
+    navigator.permissions.query = function (d) {
+      if (d && d.name && !skipPerms.includes(d.name)) intercept(d.name);
+      return _pq.call(this, d);
+    };
+  }
+
+  // ── Utility ───────────────────────────────────────────────────────────────
   function fmtPerm(p) {
-    return { camera:"Camera", microphone:"Microphone", geolocation:"Location",
-      "clipboard-read":"Clipboard Read", "clipboard-write":"Clipboard Write",
-      notifications:"Notifications" }[p] || p;
+    var m = { camera:"Camera", microphone:"Microphone", geolocation:"Location", "clipboard-read":"Clipboard Read", "clipboard-write":"Clipboard Write", notifications:"Notifications" };
+    return m[p] || (p ? p.charAt(0).toUpperCase() + p.slice(1) : "Unknown");
   }
 
 })();

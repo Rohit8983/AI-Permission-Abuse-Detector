@@ -2,22 +2,31 @@
   "manifest_version": 3,
   "name": "AI Permission Abuse Detector",
   "version": "1.0.0",
-  "description": "Intelligent website permission risk analysis powered by AI",
+  "description": "AI-powered browser extension that detects and explains suspicious website permission requests in real time.",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ai-permission-detector@rohit8983",
+      "strict_min_version": "109.0"
+    }
+  },
+
   "permissions": [
     "tabs",
     "activeTab",
     "notifications",
     "storage",
-    "scripting",
-    "webRequest",
-    "contextMenus"
+    "scripting"
   ],
+
   "host_permissions": [
     "<all_urls>"
   ],
+
   "background": {
     "service_worker": "background.js"
   },
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -27,25 +36,28 @@
       "world": "MAIN"
     }
   ],
+
   "action": {
     "default_popup": "popup.html",
     "default_title": "AI Permission Detector",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
+      "16":  "icons/icon16.png",
+      "32":  "icons/icon32.png",
+      "48":  "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
+
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
+    "16":  "icons/icon16.png",
+    "32":  "icons/icon32.png",
+    "48":  "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "popup.html", "popup.js"],
+      "resources": ["icons/*"],
       "matches": ["<all_urls>"]
     }
   ]

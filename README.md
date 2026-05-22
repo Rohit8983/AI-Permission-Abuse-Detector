@@ -172,4 +172,3 @@ Never. Everything runs locally — on your machine. The extension stores data in
 Not yet. This version is built for Chrome (Manifest V3). Firefox support is planned as a future enhancement.
 
 
-
